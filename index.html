@@ -7,6 +7,7 @@
 <link rel="icon" id="fav">
 <meta name="description" content="Build a 3D cave that tells your life story. Share it now, keep it forever, and control who gets in.">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 :root{--bg:#040806;--bg2:#0a1411;--ink:#f2fbf6;--mute:#9bb5a8;--gold:#1fd27f;--line:#15302a}
 *{box-sizing:border-box;margin:0}
@@ -131,6 +132,7 @@ textarea{min-height:100px;resize:vertical}
 <button class="pill" onclick="closeMake()">← Back</button>
 <h2 style="margin:22px 0 4px">Create your cave</h2>
 <p class="sub" style="margin-bottom:10px">Add a picture and a story for each memory. Each one is hung as a framed picture on your cave wall.</p>
+<div id="authbox"></div>
 <label>What kind of cave is this?</label><select class="f" id="ct"><option value="own">My own life</option><option value="gift">A gift for someone</option><option value="memorial">In memory of someone</option></select>
 <label>Name of the person this cave is about</label><input id="nm" placeholder="e.g. Grandpa Joseph">
 <label>Made by (shown on gifts and memorials)</label><input id="mb" placeholder="Your name">
@@ -149,7 +151,7 @@ textarea{min-height:100px;resize:vertical}
 <h3 style="margin:34px 0 4px">Your memories</h3><div id="list"></div>
 <div class="row"><button class="btn" onclick="enterMine()">Enter my cave</button>
 <button class="btn ghost" onclick="copyLink()">Copy share link</button></div>
-<p class="note" id="cn">Saved in this browser. Share links carry text only; pictures are included once the site is hosted with an account system.</p>
+<p class="note" id="cn">Your cave is saved online. Press “Copy share link” to share it with anyone.</p>
 </div></div>
 
 <script>
@@ -163,14 +165,14 @@ var DEMO={name:"Amara Okafor",cid:"demo",music:"ambient",cv:{hl:"Printer, mentor
 {t:"Lessons for my grandchildren",y:"2015",a:1,d:"Be curious. Be kind when no one is watching. Call your grandmother.",l:"date",dt:"2030-01-01"},
 {t:"Things I never said",y:"",a:1,d:"This chamber is private. Only I can open it.",l:"manual"},
 {t:"A letter for your 18th birthday",y:"",a:1,d:"If you are reading this, I am no longer there. I am proud of you. I always was.",l:"date",dt:"2031-06-15"}]};
-var S={mine:(function(){try{return JSON.parse(localStorage.getItem("sc")||"null")}catch(e){return null}})()||{name:"",mem:[]}},cur=DEMO,R,sc,cam,curve,fr=[],T=0,Tg=0,yaw=0,yu=0,drag=null,init=false,raf;
+var S={mine:{name:"",mem:[]}},cur=DEMO,R,sc,cam,curve,fr=[],T=0,Tg=0,yaw=0,yu=0,drag=null,init=false,raf;
 function $(i){return document.getElementById(i)}
-function save(){try{localStorage.setItem("sc",JSON.stringify(S.mine));return true}catch(e){if(!save.w){save.w=1;alert("This browser can’t store your cave permanently (storage is full or blocked). It will work until you close this page. Try a smaller picture or a shorter recording.")}return false}}
-function allowed(m,i){if($("view").value=="owner"||m.l=="public")return true;if(m.l=="pin")return !!UN[i];if(m.l=="manual")return !!m.open;if(m.l=="date")return !!m.dt&&Date.now()>=new Date(m.dt+"T00:00:00").getTime();return false}
+function save(){return true}
+function allowed(m,i){if(m.srv)return !m.lk||!!UN[i];if($("view").value=="owner"||m.l=="public")return true;if(m.l=="pin")return !!UN[i];if(m.l=="manual")return !!m.open;if(m.l=="date")return !!m.dt&&Date.now()>=new Date(m.dt+"T00:00:00").getTime();return false}
 function fmtD(s){return new Date(s+"T00:00:00").toLocaleDateString(undefined,{day:"numeric",month:"short",year:"numeric"})}
 function lab(m){return m.l=="public"?"Public":m.l=="pin"?"PIN protected":m.l=="manual"?(m.open?"Opened by creator":"Sealed by creator"):"Opens "+fmtD(m.dt)}
 function cl(v){return Math.max(0,Math.min(1,v))}
-function openCave(d){cur=d;UN={};$("view").value=(d===S.mine?"owner":"visitor");$("who").textContent=title(d);$("cave").classList.add("on");$("panel").classList.remove("on");
+function openCave(d){cur=d;UN={};$("view").value=(d===S.mine?"owner":"visitor");$("view").style.display=d.srv?"none":"";$("who").textContent=title(d);$("cave").classList.add("on");$("panel").classList.remove("on");
  if(typeof THREE=="undefined"){$("panel").innerHTML="<p>The 3D engine could not load. Connect to the internet and reload.</p>";$("panel").classList.add("on");return}
  if(!init)setup();build();musicStart();visits(d);Tg=T=0;yu=yaw=0;cancelAnimationFrame(raf);loop()}
 function closeCave(){if(VU){VU();VU=null}musicStop();stopAuto();$("cave").classList.remove("on");cancelAnimationFrame(raf)}
@@ -193,7 +195,7 @@ function redraw(o){var u=o.userData,m=u.m,ok=allowed(m,u.i),c=u.c,x=c.getContext
  x.fillStyle="#e9f3ee";x.fillRect(16,16,480,608);x.fillStyle="#06100c";x.fillRect(X-8,Y-8,W+16,H+16);
  x.save();x.beginPath();x.rect(X,Y,W,H);x.clip();
  if(!ok){x.fillStyle="#07110d";x.fillRect(X,Y,W,H);x.strokeStyle="#1fd27f";x.lineWidth=12;x.beginPath();x.arc(256,230,42,Math.PI,0);x.stroke();x.fillStyle="#1fd27f";x.fillRect(206,230,100,80);x.fillStyle="#07110d";x.beginPath();x.arc(256,262,10,0,7);x.fill();x.fillRect(252,262,8,28)}
- else if(m.i){if(!u.im){u.im=new Image();u.im.onload=function(){redraw(o)};u.im.src=m.i}
+ else if(m.i){if(!u.im){u.im=new Image();u.im.crossOrigin="anonymous";u.im.onload=function(){redraw(o)};u.im.src=m.i}
   if(u.im.complete&&u.im.naturalWidth){var s=Math.max(W/u.im.naturalWidth,H/u.im.naturalHeight),w=u.im.naturalWidth*s,h=u.im.naturalHeight*s;x.drawImage(u.im,X+(W-w)/2,Y+(H-h)/2,w,h)}else{x.fillStyle="#0b1a14";x.fillRect(X,Y,W,H)}}
  else if(m.a){art(x,u.i,512,640)}
  else if(m.au&&!m.d){x.fillStyle="#0b1a14";x.fillRect(X,Y,W,H);x.fillStyle="#1fd27f";x.beginPath();x.moveTo(170,190);x.lineTo(220,190);x.lineTo(280,140);x.lineTo(280,330);x.lineTo(220,280);x.lineTo(170,280);x.fill();x.strokeStyle="#1fd27f";x.lineWidth=10;[1,2,3].forEach(function(k){x.beginPath();x.arc(290,235,k*34,-.9,.9);x.stroke()});x.fillStyle="#9bb5a8";x.font="24px system-ui";x.textAlign="center";x.fillText("Tap to listen",256,400);x.textAlign="left"}
@@ -229,10 +231,10 @@ function showMem(i){var m=cur.mem[i],ok=allowed(m,i),own=$("view").value=="owner
  p.innerHTML='<button class="x" onclick="this.parentNode.classList.remove(\'on\')">×</button><div class="tag"></div><h3></h3><div id="pb"></div>';
  var pb=$("pb");p.querySelector(".tag").textContent=lab(m)+(ok&&m.y?" · "+m.y:"")+(ok&&m.by?" · added by "+m.by:"");
  if(ok){p.querySelector("h3").textContent=m.t;if(m.i){var im=document.createElement("img");im.src=m.i;pb.appendChild(im)}if(m.au){var au=document.createElement("audio");au.controls=true;au.src=m.au;au.style.cssText="width:100%;margin:8px 0";pb.appendChild(au)}q=document.createElement("p");q.textContent=m.d;pb.appendChild(q);cmts(pb,i);
-  if(own&&m.l=="manual")btn(pb,m.open?"Lock again":"Open for visitors",function(){m.open=!m.open;if(cur===S.mine)save();redraw(fr[i]);showMem(i)})}
+  if(own&&m.l=="manual")btn(pb,m.open?"Lock again":"Open for visitors",function(){m.open=!m.open;if(cur===S.mine&&m.id)sb.from("memories").update({is_open:m.open}).eq("id",m.id).then(function(r){if(r.error)alert(r.error.message)});redraw(fr[i]);showMem(i)})}
  else{p.querySelector("h3").textContent="🔒 Locked";q=document.createElement("p");pb.appendChild(q);
   if(m.l=="pin"){q.textContent="Enter the PIN to open this picture.";var inp=document.createElement("input");inp.type="password";inp.inputMode="numeric";inp.placeholder="PIN";inp.style.margin="10px 0";pb.appendChild(inp);
-   btn(pb,"Unlock",function(){if(inp.value===String(m.pin)){UN[i]=1;redraw(fr[i]);showMem(i)}else{q.textContent="Wrong PIN. Try again.";inp.value=""}})}
+   btn(pb,"Unlock",function(){unlockPin(m,i,inp.value,q,inp)})}
   else if(m.l=="date"){var dd=Math.ceil((new Date(m.dt+"T00:00:00")-Date.now())/864e5);q.textContent="Sealed until "+fmtD(m.dt)+" ("+dd+" days to go). It opens by itself on that day."}
   else q.textContent="The creator will open this picture when the time is right."}
  p.classList.add("on")}
@@ -250,7 +252,7 @@ var AS=0,AF=-1,AW=0,MUS={on:true};
 function title(d){var n=d.name||"";return d.type=="gift"?"A gift for "+n+(d.by?", from "+d.by:""):d.type=="memorial"?"In memory of "+n:(n?n+"’s cave":"A cave")}
 function esc(s){return String(s||"").replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
 function ensureCV(){return S.mine.cv=S.mine.cv||{hl:"",em:"",ph:"",lo:"",su:"",sk:"",j:[],s:[]}}
-function readMeta(){var s=S.mine;s.name=$("nm").value.trim();s.type=$("ct").value;s.by=$("mb").value.trim();s.music=$("cm").value;if($("cv_hl")){var v=ensureCV();["hl","em","ph","lo","su","sk"].forEach(function(k){v[k]=$("cv_"+k).value.trim()})}}
+function readMeta(){var s=S.mine;s.name=$("nm").value.trim();s.type=$("ct").value;s.by=$("mb").value.trim();s.music=$("cm").value;if(ME){clearTimeout(readMeta.t);readMeta.t=setTimeout(syncMeta,500)}if($("cv_hl")){var v=ensureCV();["hl","em","ph","lo","su","sk"].forEach(function(k){v[k]=$("cv_"+k).value.trim()})}}
 function fillMeta(){var s=S.mine;$("nm").value=s.name||"";$("ct").value=s.type||"own";$("mb").value=s.by||"";$("cm").value=s.music||"none";$("mf").style.display=s.music=="file"?"block":"none";$("ms").textContent=s.mf?"A music file is saved.":""}
 var KIND="",PR=["Where I grew up","The person who shaped me","My proudest moment","A lesson I learned the hard way","How I met the love of my life","The best advice I ever got","A letter to my grandchildren","Something I never told anyone","A meal that means home"],
 PC=[{t:"A job or role I held",k:"job"},{t:"My education",k:"edu"},{t:"An award or achievement",k:"award"},{t:"A skill I mastered",k:"skill"},{t:"A business or project I built",k:"job"}],
@@ -273,7 +275,8 @@ function voice(){var b=$("vb");if(MR&&MR.state=="recording"){MR.stop();return}
   MR.start();b.textContent="⏹ Stop";$("vs").textContent="Recording… tap Stop when you’re done (up to 60 seconds).";tm=setTimeout(function(){if(MR.state=="recording")MR.stop()},60000)
  }).catch(function(e){$("vs").textContent=(e&&e.name=="NotAllowedError")?"Microphone permission was denied. Allow it in your browser settings, or upload an audio file.":"Couldn’t start the microphone. Upload an audio file instead."})}
 /* music */
-function musicFile(inp){var f=inp.files[0];if(!f)return;if(f.size>2.5e6){alert("Please choose a file under 2.5 MB.");inp.value="";return}var r=new FileReader();r.onload=function(){S.mine.mf=r.result;S.mine.music="file";save();$("ms").textContent="Music saved: "+f.name};r.readAsDataURL(f)}
+function musicFile(inp){var f=inp.files[0];if(!f)return;if(f.size>6e6){alert("Please choose a file under 6 MB.");inp.value="";return}if(!ME){alert("Please sign in first.");inp.value="";return}$("ms").textContent="Uploading…";readMeta();
+ ensureCave().then(function(){return upMedia(f,ext(f))}).then(function(u){S.mine.mf=u;S.mine.music="file";$("cm").value="file";$("ms").textContent="Music uploaded: "+f.name;return syncMeta()}).catch(function(e){$("ms").textContent="Upload failed: "+(e.message||e)})}
 function ambient(){try{var C=MUS.ctx=MUS.ctx||new (window.AudioContext||window.webkitAudioContext)();C.resume();var g=C.createGain();g.gain.value=0;g.gain.linearRampToValueAtTime(.13,C.currentTime+3);var fl=C.createBiquadFilter();fl.type="lowpass";fl.frequency.value=700;g.connect(fl);fl.connect(C.destination);var os=[];
  [110,164.81,220,277.18,329.63].forEach(function(q,i){var o=C.createOscillator();o.type=i%2?"triangle":"sine";o.frequency.value=q;var og=C.createGain();og.gain.value=.5/(i+1.5);var l=C.createOscillator();l.frequency.value=.07+i*.03;var lg=C.createGain();lg.gain.value=.25;l.connect(lg);lg.connect(og.gain);o.connect(og);og.connect(g);o.start();l.start();os.push(o,l)});
  MUS.stop=function(){g.gain.linearRampToValueAtTime(0,C.currentTime+.5);setTimeout(function(){os.forEach(function(o){try{o.stop()}catch(e){}})},700)}}catch(e){}}
@@ -282,7 +285,7 @@ function musicStop(){if(MUS.el){MUS.el.pause();MUS.el=null}if(MUS.stop){MUS.stop
 function musicNudge(){if(!MUS.on)return;if(MUS.ctx)MUS.ctx.resume();if(MUS.el&&MUS.el.paused)MUS.el.play().catch(function(){});if(!MUS.el&&!MUS.stop&&cur.music&&cur.music!="none")musicStart()}
 function musicToggle(){MUS.on=!MUS.on;$("mus").textContent=MUS.on?"🔊 Music":"🔇 Music";MUS.on?musicStart():musicStop()}
 /* comments */
-function cmts(pb,i){var k="cm_"+(cur.name||"cave")+"_"+i,L=[];try{L=JSON.parse(localStorage.getItem(k)||"[]")}catch(e){}
+function cmts(pb,i){var m0=cur.mem[i],code0=cur.srv?cur.cid:cur.code;if(sb&&code0&&m0.id){return srvCmts(pb,m0.id,code0)}var k="cm_"+(cur.name||"cave")+"_"+i,L=[];try{L=JSON.parse(localStorage.getItem(k)||"[]")}catch(e){}
  var h=document.createElement("div");h.className="tag";h.style.marginTop="16px";h.textContent="Comments ("+L.length+")";pb.appendChild(h);
  L.forEach(function(c){var d=document.createElement("p");d.textContent=c.n+": "+c.t;d.style.cssText="margin:6px 0;border-left:2px solid var(--gold);padding-left:10px";pb.appendChild(d)});
  var n=document.createElement("input");n.placeholder="Your name";n.style.margin="8px 0";var t=document.createElement("textarea");t.placeholder="Leave a comment…";t.style.minHeight="60px";pb.appendChild(n);pb.appendChild(t);
@@ -296,39 +299,82 @@ function stepAuto(nw,dt){if(AW){if(nw>AW){if($("panel").classList.contains("on")
  var tg=fr[AS].userData.t-.008;Tg=Math.min(Tg+dt*.05,tg);if(Tg>=tg-.0005){AF=AS++;AW=nw+12000;showCont(true)}}
 /* CV */
 /* visitors */
-var VU=null,DBH=null;
-function cidOf(){if(!S.mine.cid){S.mine.cid=Math.random().toString(36).slice(2,10);save()}return S.mine.cid}
-function dbInit(){if(!DBH)DBH=(window.claude&&claude.use?Promise.all([claude.use("db"),claude.use("user")]).then(function(r){return r[0]?{db:r[0],u:r[1]}:false}).catch(function(){return false}):Promise.resolve(false));return DBH}
+var VU=null;
 function showV(n,loc){$("vc").textContent="👁 "+n+(n==1?" visitor":" visitors")+(loc?" (this device)":"")}
 function localV(id,count){var k="vis_"+id,n=0;try{n=+localStorage.getItem(k)||0;if(count){n++;localStorage.setItem(k,n)}}catch(e){}showV(n,true)}
-function visits(d){var own=d===S.mine,id=String(own?cidOf():d.cid||"").replace(/[^a-z0-9]/g,"")||"anon",fin=0;if(VU){VU();VU=null}$("vc").textContent="👁 …";
- function fb(){if(!fin){fin=1;localV(id,!own)}}
- dbInit().then(function(h){if(!h){fb();return}var tm=setTimeout(fb,8000);
-  (h.u&&h.u.id?h.u.id():Promise.resolve(null)).then(function(uid){
-   if(!own&&uid)h.db.doc("visits/"+id+"_"+uid).set({cid:id,t:Date.now()}).catch(function(){});
-   VU=h.db.collection("visits").where("cid","==",id).onSnapshot(function(s){clearTimeout(tm);fin=1;showV(s.size,false)},function(){clearTimeout(tm);fb()})}).catch(fb)})}
+function visits(d){var code=d.srv?d.cid:d.code,vc=$("vc");vc.textContent="👁 …";
+ if(!sb||!code||!d.mem.some(function(m){return m.id})){localV(d===DEMO?"demo":"draft",d===DEMO);return}
+ (d.srv?sb.rpc("record_visit",{p_code:code,p_visitor:vid()}):sb.rpc("visit_count",{p_code:code})).then(function(r){if(r.error||r.data==null){vc.textContent="";return}showV(r.data,false)})}
+/* online */
+var SBU="https://fcqbnkgcwwkvdkwnvtlp.supabase.co",SBK="sb_publishable_4tZfG4eDSiTaNsOph6DaYw_itpjZmJ-",sb=null,ME=null;
+try{sb=supabase.createClient(SBU,SBK)}catch(e){}
+function uid(){return window.crypto&&crypto.randomUUID?crypto.randomUUID():"id"+Date.now().toString(36)+Math.random().toString(36).slice(2)}
+function newCode(){return Math.random().toString(36).slice(2,9).padEnd(7,"x")}
+function vid(){var v=null;try{v=localStorage.getItem("vid");if(!v){v=uid();localStorage.setItem("vid",v)}}catch(e){v=uid()}return v}
+function dataBlob(u){return fetch(u).then(function(r){return r.blob()})}
+function ext(b){var t=(b.type||"").split(";")[0];return t.indexOf("jpeg")>0?"jpg":t.indexOf("png")>0?"png":t.indexOf("webm")>0?"webm":(t.indexOf("mp4")>0||t.indexOf("m4a")>0||t.indexOf("aac")>0)?"m4a":t.indexOf("mpeg")>0?"mp3":t.indexOf("ogg")>0?"ogg":t.indexOf("wav")>0?"wav":"bin"}
+function upMedia(blob,x){var p=S.mine.code+"/"+uid()+"."+x;return sb.storage.from("media").upload(p,blob,{contentType:blob.type||"application/octet-stream"}).then(function(r){if(r.error)throw r.error;return sb.storage.from("media").getPublicUrl(p).data.publicUrl})}
+function imgBlob(f){return new Promise(function(res,rej){var im=new Image();im.onload=function(){var s=Math.min(1,1000/Math.max(im.width,im.height)),c=document.createElement("canvas");c.width=Math.round(im.width*s);c.height=Math.round(im.height*s);c.getContext("2d").drawImage(im,0,0,c.width,c.height);c.toBlob(function(b){b?res(b):rej(new Error("Couldn’t process the picture."))},"image/jpeg",.82)};im.onerror=function(){rej(new Error("This picture couldn’t be read. Please choose a JPG or PNG."))};im.src=URL.createObjectURL(f)})}
+function renderAuth(){var a=$("authbox");if(!a)return;a.innerHTML="";
+ if(!sb){a.innerHTML='<p class="note">Online features couldn’t load. Check your connection and reload.</p>';return}
+ if(ME){var p=document.createElement("p");p.className="note";p.textContent="Signed in as "+ME.email+". Your cave saves online. ";var b=document.createElement("button");b.className="pill";b.textContent="Sign out";b.onclick=function(){sb.auth.signOut()};p.appendChild(b);a.appendChild(p);return}
+ a.innerHTML='<div class="card" style="padding:16px"><p class="note" style="margin:0 0 8px">Sign in to save your cave online and get a link you can share.</p><input id="ae" type="email" placeholder="Email"><input id="ap" type="password" placeholder="Password (6 or more characters)" style="margin-top:8px"><div class="row" style="margin-top:10px"><button class="btn" onclick="doAuth(0)">Sign in</button><button class="btn ghost" onclick="doAuth(1)">Create account</button></div><p class="note" id="am"></p></div>'}
+function doAuth(up){var e=$("ae").value.trim(),p=$("ap").value,m=$("am");if(!e||p.length<6){m.textContent="Enter your email and a password of 6 or more characters.";return}m.textContent="One moment…";
+ (up?sb.auth.signUp({email:e,password:p}):sb.auth.signInWithPassword({email:e,password:p})).then(function(r){if(r.error){m.textContent=r.error.message;return}if(up&&!r.data.session)m.textContent="Check your email to confirm your account, then sign in."})}
+function fromRow(r){return{id:r.id,t:r.title,d:r.story||"",y:r.year||"",l:r.level,dt:r.unlock_date||"",open:r.is_open,i:r.image_url||"",au:r.audio_url||"",cv:r.cv||undefined,idx:r.idx}}
+function loadMine(){function fin(){renderAuth();if($("make").classList.contains("on")){fillMeta();renderList()}}
+ sb.from("caves").select("*").eq("owner",ME.id).limit(1).then(function(r){var c=r.data&&r.data[0];
+  if(!c){S.mine={name:"",mem:[],code:newCode()};fin();return}
+  S.mine={code:c.code,made:1,name:c.name||"",type:c.type||"own",by:c.made_by||"",music:c.music||"none",mf:c.music_url||"",mem:[]};
+  sb.from("memories").select("*").eq("cave_code",c.code).order("idx").then(function(m){S.mine.mem=(m.data||[]).map(fromRow);fin()})})}
+if(sb)sb.auth.onAuthStateChange(function(ev,s){ME=s?s.user:null;if(ME)loadMine();else{S.mine={name:"",mem:[]};renderAuth();if($("make").classList.contains("on")){fillMeta();renderList()}}});
+function syncMeta(){if(!sb||!ME)return Promise.resolve();var s=S.mine;if(!s.code)s.code=newCode();
+ return sb.from("caves").upsert({code:s.code,owner:ME.id,name:s.name||"",type:s.type||"own",made_by:s.by||"",music:s.music||"none",music_url:s.mf||null}).then(function(r){if(r.error){alert("Couldn’t save your cave: "+r.error.message);return}s.made=1})}
+function ensureCave(){return S.mine.made?Promise.resolve():syncMeta()}
+function unlockPin(m,i,pin,q,inp){var code=cur.srv?cur.cid:cur.code;
+ if(!sb||!code||!m.id){if(pin===String(m.pin)){UN[i]=1;redraw(fr[i]);showMem(i)}else{q.textContent="Wrong PIN. Try again.";inp.value=""}return}
+ q.textContent="Checking…";sb.rpc("unlock_pin",{p_code:code,p_id:m.id,p_pin:pin}).then(function(r){var x=r.data;if(r.error||!x){q.textContent="Wrong PIN. Try again.";inp.value="";return}
+  if(cur.srv){m.t=x.title;m.d=x.story||"";m.y=x.year||"";m.i=x.image_url||"";m.au=x.audio_url||"";m.cv=x.cv||undefined;m.lk=false;fr[i].userData.im=null}
+  UN[i]=1;redraw(fr[i]);showMem(i)})}
+function srvCmts(pb,id,code){var h=document.createElement("div");h.className="tag";h.style.marginTop="16px";h.textContent="Comments";pb.appendChild(h);var lst=document.createElement("div");pb.appendChild(lst);
+ function load(){sb.rpc("get_comments",{p_code:code,p_id:id}).then(function(r){lst.innerHTML="";var L=r.data||[];h.textContent="Comments ("+L.length+")";L.forEach(function(c){var d=document.createElement("p");d.textContent=c.name+": "+c.body;d.style.cssText="margin:6px 0;border-left:2px solid var(--gold);padding-left:10px";lst.appendChild(d)})})}load();
+ var n=document.createElement("input");n.placeholder="Your name";n.maxLength=40;n.style.margin="8px 0";var t=document.createElement("textarea");t.placeholder="Leave a comment…";t.maxLength=500;t.style.minHeight="60px";pb.appendChild(n);pb.appendChild(t);
+ var sp=document.createElement("div");sp.style.height="8px";pb.appendChild(sp);
+ btn(pb,"Post comment",function(){var a=n.value.trim(),b=t.value.trim();if(!a||!b)return;sb.rpc("add_comment",{p_code:code,p_id:id,p_name:a,p_body:b}).then(function(r){if(r.error){alert("Couldn’t post: "+r.error.message);return}n.value=t.value="";load()})})}
+function loadShared(code){if(!sb)return;sb.rpc("get_cave",{p_code:code}).then(function(r){var x=r.data;if(r.error||!x){alert("This cave couldn’t be found.");return}
+ openCave({srv:1,cid:code,name:x.name,type:x.type,by:x.made_by,music:x.music,mf:x.music_url,mem:(x.memories||[]).map(function(m){return{id:m.id,t:m.locked?"Locked":m.title,d:m.story||"",y:m.year||"",l:m.level,dt:m.unlock_date||"",open:false,i:m.image_url||"",au:m.audio_url||"",cv:m.cv||undefined,srv:1,lk:!!m.locked}})})})}
+function route(){var m=/^#c=([a-z0-9]{3,12})$/.exec(location.hash);if(m)loadShared(m[1])}
+addEventListener("load",route);addEventListener("hashchange",route);
 /* creator */
-function openMake(){fillMeta();chips();$("make").classList.add("on");renderList()}
+function openMake(){fillMeta();chips();renderAuth();$("make").classList.add("on");renderList()}
 function closeMake(){readMeta();save();$("make").classList.remove("on")}
 function prevPic(i){var f=i.files[0],p=$("pv");$("as").textContent="";if(!f){p.style.display="none";return}p.onerror=function(){p.style.display="none";$("as").textContent="That picture format can’t be read. Please choose a JPG or PNG."};p.src=URL.createObjectURL(f);p.style.display="block"}
 function renderList(){var l=$("list");l.innerHTML="";if(!S.mine.mem.length)l.innerHTML='<p class="note">Nothing yet. Add your first memory above.</p>';
  S.mine.mem.forEach(function(m,i){var d=document.createElement("div");d.className="mem";var w=document.createElement("span");w.style.cssText="display:flex;align-items:center;gap:10px;min-width:0";
   if(m.i){var im=document.createElement("img");im.src=m.i;im.style.cssText="width:40px;height:40px;object-fit:cover;border-radius:6px";w.appendChild(im)}
   var s=document.createElement("span");s.textContent=m.t+(m.au?" · 🔊":"")+" · "+lab(m);w.appendChild(s);
-  var b=document.createElement("button");b.textContent="✕";b.onclick=function(){S.mine.mem.splice(i,1);save();renderList()};d.appendChild(w);d.appendChild(b);l.appendChild(d)})}
-function addMem(){var t=$("mt").value.trim()||kTitle(),d=$("md").value.trim(),autoD=0;if(!d&&KIND&&kTitle()&&!AUD&&!$("mi").files[0]){d=kTitle()+($("ky").value.trim()?" · "+$("ky").value.trim():"");autoD=1}if(!t){alert("Give this picture a title.");return}if(!d&&!AUD&&!$("mi").files[0]){alert("A frame can’t be empty. Add a picture, record your voice, or write some text.");return}
- readMeta();var m={t:t,d:d,l:$("ml").value,y:$("my").value.trim()},f=$("mi").files[0];
+  var b=document.createElement("button");b.textContent="✕";b.onclick=function(){if(!confirm("Remove this picture?"))return;sb.from("memories").delete().eq("id",m.id).then(function(r){if(r.error){alert(r.error.message);return}S.mine.mem.splice(i,1);renderList()})};d.appendChild(w);d.appendChild(b);l.appendChild(d)})}
+var ADDING=0;
+function resetForm(){$("mt").value=$("md").value=$("mi").value=$("my").value=$("mp").value=$("mdt").value="";["kr","ko","ky"].forEach(function(k){$(k).value=""});setKind("","");$("pv").style.display="none";$("va").style.display="none";$("vs").textContent="";$("vb").textContent="🎙 Record your voice";$("af").value=""}
+function addMem(){if(ADDING)return;if(!ME){alert("Please sign in first so your pictures are saved online.");return}
+ var t=$("mt").value.trim()||kTitle(),d=$("md").value.trim(),autoD=0,f=$("mi").files[0],au=AUD;
+ if(!d&&KIND&&kTitle()&&!au&&!f){d=kTitle()+($("ky").value.trim()?" · "+$("ky").value.trim():"");autoD=1}
+ if(!t){alert("Give this picture a title.");return}
+ if(!d&&!au&&!f){alert("A frame can’t be empty. Add a picture, record your voice, or write some text.");return}
+ readMeta();var m={id:uid(),t:t,d:d,l:$("ml").value,y:$("my").value.trim()};
  if(m.l=="pin"){if(!/^\d{4,8}$/.test($("mp").value)){alert("The PIN must be 4 to 8 digits.");return}m.pin=$("mp").value}
  if(m.l=="date"){if(!$("mdt").value){alert("Pick the date it should open.");return}m.dt=$("mdt").value}
- if(KIND){var K={k:KIND,r:$("kr").value.trim(),o:$("ko").value.trim(),y:$("ky").value.trim(),ad:autoD};if(!K.r){alert("Fill in the first detail so it can go on your CV.");return}m.cv=K;if(!m.y)m.y=K.y}if(AUD)m.au=AUD;AUD="";$("va").style.display="none";$("vs").textContent="";$("vb").textContent="🎙 Record your voice";$("af").value="";
- function done(){S.mine.mem.push(m);save();renderList();$("mt").value=$("md").value=$("mi").value=$("my").value=$("mp").value=$("mdt").value="";["kr","ko","ky"].forEach(function(k){$(k).value=""});setKind("","");$("as").textContent="Added ✓ "+m.t;$("pv").style.display="none"}
- if(!f)return done();
- var im=new Image(),u=URL.createObjectURL(f);im.onload=function(){var s=Math.min(1,700/im.width),c=document.createElement("canvas");c.width=im.width*s;c.height=im.height*s;c.getContext("2d").drawImage(im,0,0,c.width,c.height);m.i=c.toDataURL("image/jpeg",.7);done()};im.onerror=function(){alert("This picture couldn’t be read. Please choose a JPG or PNG.")};im.src=u}
+ if(KIND){var K={k:KIND,r:$("kr").value.trim(),o:$("ko").value.trim(),y:$("ky").value.trim(),ad:autoD};if(!K.r){alert("Fill in the first detail so it can go on your CV.");return}m.cv=K;if(!m.y)m.y=K.y}
+ ADDING=1;$("as").textContent="Saving…";
+ ensureCave().then(function(){return f?imgBlob(f).then(function(b){return upMedia(b,"jpg")}).then(function(u){m.i=u}):0})
+ .then(function(){return au?dataBlob(au).then(function(b){return upMedia(b,ext(b))}).then(function(u){m.au=u}):0})
+ .then(function(){var mx=-1;S.mine.mem.forEach(function(x){if((x.idx||0)>mx)mx=x.idx||0});m.idx=mx+1;
+  return sb.from("memories").insert({id:m.id,cave_code:S.mine.code,idx:m.idx,title:m.t,story:m.d,year:m.y||"",level:m.l,pin:m.pin||null,unlock_date:m.dt||null,is_open:false,image_url:m.i||null,audio_url:m.au||null,cv:m.cv||null})})
+ .then(function(r){if(r.error)throw r.error;delete m.pin;S.mine.mem.push(m);AUD="";renderList();resetForm();$("as").textContent="Added ✓ "+m.t;ADDING=0})
+ .catch(function(e){ADDING=0;$("as").textContent="";alert("Couldn’t save this picture: "+(e.message||e))})}
 function enterMine(){readMeta();save();if(!S.mine.mem.length){alert("Add at least one memory first.");return}closeMake();$("view").value="owner";openCave(S.mine)}
-function copyLink(){readMeta();var j=JSON.stringify({name:S.mine.name,type:S.mine.type,by:S.mine.by,cid:cidOf(),music:S.mine.music=="file"?"none":S.mine.music,mem:S.mine.mem.map(function(m){return{t:m.t,d:m.d||"(Pictures and voice recordings are shared once the hosted version is live.)",l:m.l,y:m.y,pin:m.pin,dt:m.dt,open:m.open}})}),
- u=location.href.split("#")[0]+"#cave="+btoa(unescape(encodeURIComponent(j)));
- (navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(function(){$("cn").textContent="Link copied. Locked pictures stay locked for visitors."},function(){prompt("Copy your link:",u)})}
-if(location.hash.indexOf("#cave=")==0){try{var dd=JSON.parse(decodeURIComponent(escape(atob(location.hash.slice(6)))));addEventListener("load",function(){openCave(dd)})}catch(e){}}
+function copyLink(){if(!ME){alert("Please sign in first.");return}readMeta();if(!S.mine.mem.length){alert("Add at least one picture first.");return}
+ syncMeta().then(function(){var u=location.href.split("#")[0].split("?")[0]+"#c="+S.mine.code;(navigator.clipboard?navigator.clipboard.writeText(u):Promise.reject()).then(function(){$("cn").textContent="Link copied: "+u},function(){prompt("Copy your link:",u)})})}
 </script>
 </body>
 </html>
